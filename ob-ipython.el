@@ -136,7 +136,8 @@ can be displayed.")
   (error "There was a fatal error trying to process the request. See *ob-ipython-debug*"))
 
 (defun ob-ipython--generate-file-name (suffix)
-  (s-concat (make-temp-name ob-ipython-resources-dir) suffix))
+  (org-with-point-at org-babel-current-src-block-location
+    (s-concat ob-ipython-resources-dir (org-babel-sha1-hash) suffix)))
 
 ;; process management
 
@@ -418,23 +419,24 @@ This function is called by `org-babel-execute-src-block'."
 ;;; TODO: we create a new image every time
 (defun ob-ipython--render (file-or-nil values)
   (-some (lambda (value)
-           (cond ((eq (car value) 'image/png)
-                  (let ((file (or file-or-nil (ob-ipython--generate-file-name ".png"))))
-                    (ob-ipython--write-base64-string file (cdr value))
-                    (format "[[%s]]" file)))
-                 ((eq (car value) 'image/svg+xml)
-                  (let ((file (or file-or-nil (ob-ipython--generate-file-name ".svg"))))
-                    (ob-ipython--write-base64-string file (cdr value))
-                    (format "[[%s]]" file)))
-                 ((eq (car value) 'text/html)
-                  (let ((pandoc (executable-find "pandoc")))
-                    (and pandoc (with-temp-buffer
-                                  (insert (cdr value))
-                                  (shell-command-on-region
-                                   (point-min) (point-max)
-                                   (format "%s -f html -t org" pandoc) t t)
-                                  (s-trim (buffer-string))))))
-                 ((eq (car value) 'text/plain) (cdr value))))
+           (let ((type (car value))
+                 (data (cdr value)))
+             (cond ((or (eq type 'image/png)
+                        (eq type 'image/svg+xml))
+                    (let* ((file (or file-or-nil (ob-ipython--generate-file-name
+                                                  (if (eq type 'image/png) ".png" ".svg")))))
+                      (unless (f-exists-p file)
+                        (ob-ipython--write-base64-string file data))
+                      (format "[[%s]]" file)))
+                   ((eq type 'text/html)
+                    (let ((pandoc (executable-find "pandoc")))
+                      (and pandoc (with-temp-buffer
+                                    (insert data)
+                                    (shell-command-on-region
+                                     (point-min) (point-max)
+                                     (format "%s -f html -t org" pandoc) t t)
+                                    (s-trim (buffer-string))))))
+                   ((eq type 'text/plain) data))))
          values))
 
 (defun org-babel-prep-session:ipython (session params)
