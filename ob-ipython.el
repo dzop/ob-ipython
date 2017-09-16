@@ -416,7 +416,6 @@ This function is called by `org-babel-execute-src-block'."
                                     (cdr (assoc :display result))))
                         (remove-if-not nil))))))
 
-;;; TODO: we create a new image every time
 (defun ob-ipython--render (file-or-nil values)
   (-some (lambda (value)
            (let ((type (car value))
