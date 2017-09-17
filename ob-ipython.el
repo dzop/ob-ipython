@@ -410,10 +410,20 @@ This function is called by `org-babel-execute-src-block'."
     (if (eq result-type 'output)
         output
       (ob-ipython--create-stdout-buffer output)
-      (s-join "\n" (->> (-map (-partial 'ob-ipython--render file)
-                              (list (cdr (assoc :value result))
-                                    (cdr (assoc :display result))))
-                        (remove-if-not nil))))))
+      (s-join
+       "\n" (->> (-map (-partial 'ob-ipython--render file)
+                       (list (cdr (assoc :value result))
+                             (let ((img-types '(image/png image/svg+xml)))
+                               (-sort (lambda (a b)
+                                        (let* ((ai (memq (car a) img-types))
+                                               (bi (memq (car b) img-types)))
+                                          ;; Favor display values that are images
+                                          (if (and ai bi) 0
+                                            (if ai 1
+                                              (if bi -1
+                                                0)))))
+                                      (cdr (assoc :display result))))))
+                 (remove-if-not nil))))))
 
 ;;; TODO: we create a new image every time
 (defun ob-ipython--render (file-or-nil values)
