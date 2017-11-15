@@ -469,11 +469,41 @@ a new kernel will be started."
 
 ;; mode
 
+(defvar ob-ipython-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\C-c\C-c" #'ob-ipython-repl-send-buffer)
+    (define-key map "\C-c\C-s" #'ob-ipython-repl-send-line)
+    (define-key map "\C-c\C-r" #'ob-ipython-repl-send-region)
+    map))
+
+(defun ob-ipython-repl-send-string (s)
+  (when (and ob-ipython-mode org-src--babel-info)
+    (let* ((session (ob-ipython--get-session-from-edit-buffer (current-buffer)))
+           (ret (ob-ipython--eval (ob-ipython--execute-request s session))))
+      (message (->> (assoc :result ret)
+                    cdr
+                    (assoc :value)
+                    (assoc 'text/plain)
+                    cdr)))))
+
+(defun ob-ipython-repl-send-line ()
+  (interactive)
+  (ob-ipython-repl-send-string (thing-at-point 'line t)))
+
+(defun ob-ipython-repl-send-region (beginning end)
+  (interactive "r")
+  (ob-ipython-repl-send-string
+   (buffer-substring-no-properties beginning end)))
+
+(defun ob-ipython-repl-send-buffer ()
+  (interactive)
+  (ob-ipython-repl-send-region (point-min) (point-max)))
+
 (define-minor-mode ob-ipython-mode
   ""
   nil
   " ipy"
-  '())
+  ob-ipython-mode-map)
 
 ;; babel framework
 
@@ -517,6 +547,8 @@ The elements of the list have the form (\"kernel\" \"language\")."
       'org-babel-execute:ipython)
     (defalias (intern (concat "org-babel-" jupyter-lang "-initiate-session"))
       'org-babel-ipython-initiate-session)
+    (defalias (intern (concat "org-babel-edit-prep:" jupyter-lang))
+      'org-babel-edit-prep:ipython)
     kernel-lang))
 
 (defun ob-ipython-auto-configure-kernels (&optional replace)
