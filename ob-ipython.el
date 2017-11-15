@@ -192,17 +192,28 @@ can be displayed.")
                 procs)
           procs)))
 
+(defun ob-ipython--get-repl-buffer (name)
+  (get-buffer (format "*ob-ipython-repl-%s*" name)))
+
 (defun ob-ipython--create-repl (name)
   (let ((python-shell-completion-native-enable nil)
-        (cmd (s-join " " (ob-ipython--kernel-repl-cmd name))))
-    (if (string= "default" name)
-        (progn
-          (run-python cmd nil nil)
-          (format "*%s*" python-shell-buffer-name))
-      (let ((process-name (format "Python:%s" name)))
-        (get-buffer-process
-         (python-shell-make-comint cmd process-name nil))
-        (format "*%s*" process-name)))))
+        (repl-name (format "ob-ipython-repl-%s" name)))
+    (python-shell-make-comint
+     (s-join " " (ob-ipython--kernel-repl-cmd name))
+     repl-name)
+    (concat "*" repl-name "*")))
+
+(defun ob-ipython--python-shell-get-buffer (fun)
+  "Same as `python-shell-get-buffer' except return the ob-ipython
+REPL buffer for the ipython session of a src edit buffer."
+  (if (and ob-ipython-mode
+           org-src--babel-info
+           (member (car org-src--babel-info)
+                   (list "ipython" "jupyter-python")))
+      (ob-ipython--get-repl-buffer
+       (ob-ipython--get-session-from-edit-buffer (current-buffer)))
+    (funcall fun)))
+(advice-add 'python-shell-get-buffer :around 'ob-ipython--python-shell-get-buffer)
 
 ;; kernel management
 
